@@ -1,6 +1,5 @@
-// --- 1. FONCTIONS UTILITAIRES ULTRA-RAPIDES ---
+// --- 1. FONCTIONS UTILITAIRES ---
 
-// Attente de l'apparition (10ms)
 function waitForElement(selector, timeout = 2000) {
     return new Promise((resolve, reject) => {
         const intervalTime = 10;
@@ -20,14 +19,12 @@ function waitForElement(selector, timeout = 2000) {
     });
 }
 
-// Attente de la destruction (10ms) - Le secret anti-bug !
 function waitForElementToDisappear(selector, timeout = 1000) {
     return new Promise((resolve) => {
         const intervalTime = 10;
         let timeSpent = 0;
         const interval = setInterval(() => {
             const el = document.querySelector(selector);
-            // Dès que l'élément n'existe plus, on donne le feu vert
             if (!el) {
                 clearInterval(interval);
                 resolve();
@@ -47,11 +44,10 @@ function setAngularInputValue(inputElement, value) {
     inputElement.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-// Fonction pour fermer proprement le pop-up Angular
 function forceCloseDialog() {
     const backdrop = document.querySelector('.cdk-overlay-backdrop');
     if (backdrop) {
-        backdrop.click(); // Clic natif sur le fond gris = Fermeture immédiate
+        backdrop.click();
     } else {
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     }
@@ -61,8 +57,6 @@ function enableStealthMode() {
     if (document.getElementById('csfloat-stealth')) return;
     const style = document.createElement('style');
     style.id = 'csfloat-stealth';
-    
-    // Ajout de "display: none" pour empêcher Angular de rendre le HTML visuel
     style.innerHTML = `
         .cdk-overlay-container, .cdk-overlay-backdrop {
             display: none !important;
@@ -70,7 +64,6 @@ function enableStealthMode() {
             visibility: hidden !important;
             pointer-events: none !important;
         }
-        /* Bloque les animations de transition d'Angular */
         .mat-mdc-dialog-container {
             display: none !important;
             transition: none !important;
@@ -79,24 +72,20 @@ function enableStealthMode() {
     `;
     document.head.appendChild(style);
 }
+
 function disableStealthMode() {
     const style = document.getElementById('csfloat-stealth');
     if (style) style.remove();
 }
 
-// --- 2. LOGIQUE PRINCIPALE HYPER-THREADÉE ---
+// --- 2. LOGIQUE PRINCIPALE ---
 async function autoPriceLightning() {
     const itemsInQueue = Array.from(document.querySelectorAll('app-sell-queue-item'));
-    if (itemsInQueue.length === 0) {
-        console.warn("Aucun item dans la file.");
-        return;
-    }
+    if (itemsInQueue.length === 0) return;
 
     enableStealthMode();
-    console.log("⚡ Mode Éclair v2 Activé...");
 
     try {
-        // 1. Groupement
         const groupedItems = new Map();
         for (let item of itemsInQueue) {
             const nameElement = item.querySelector('.name');
@@ -109,12 +98,10 @@ async function autoPriceLightning() {
             }
         }
 
-        // 2. Traitement des groupes
         for (let [itemName, itemsList] of groupedItems.entries()) {
             const myQuantityToSell = itemsList.length;
 
             try {
-                // SÉCURITÉ 1 : On nettoie le DOM de tout ancien pop-up bloqué avant de démarrer
                 forceCloseDialog();
                 await waitForElementToDisappear('.cdk-overlay-backdrop', 500);
 
@@ -122,24 +109,21 @@ async function autoPriceLightning() {
                 const infoButton = firstItem.querySelector('button[mattooltip="Info"]');
                 if (!infoButton) continue;
 
-                // Clic pour charger les données
                 infoButton.click();
 
-                let targetPrice = 0;
-                let accumulatedQty = 0;
-
-                // Lecture rapide du tableau (timeout 2s)
                 const rowSelector = 'tbody tr.mat-mdc-row';
                 await waitForElement(rowSelector, 2000); 
                 
+                let targetPrice = 0;
+                let accumulatedQty = 0;
                 const buyOrderRows = document.querySelectorAll(rowSelector);
+                
                 for (let row of buyOrderRows) {
                     const priceCell = row.querySelector('.mat-column-price');
                     const qtyCell = row.querySelector('.mat-column-qty');
                     if (priceCell && qtyCell) {
                         let price = parseFloat(priceCell.innerText.replace(/[^0-9.-]+/g, ""));
                         let qty = parseInt(qtyCell.innerText.replace(/[^0-9]+/g, ""), 10);
-                        
                         if (!isNaN(price) && !isNaN(qty)) {
                             accumulatedQty += qty;
                             targetPrice = price;
@@ -148,10 +132,7 @@ async function autoPriceLightning() {
                     }
                 }
 
-                // SÉCURITÉ 2 : Fermeture chirurgicale immédiate
                 forceCloseDialog();
-                
-                // SÉCURITÉ 3 : On gèle le script le temps que le pop-up disparaisse vraiment du HTML
                 await waitForElementToDisappear('.cdk-overlay-backdrop', 1000);
 
                 if (targetPrice > 0) {
@@ -159,52 +140,124 @@ async function autoPriceLightning() {
                         const inputField = itemToUpdate.querySelector('input[formcontrolname="price"]');
                         if (inputField) setAngularInputValue(inputField, targetPrice);
                     }
-                    console.log(`✅ ${itemName} -> ${targetPrice}$`);
-                } else {
-                    console.warn(`⚠️ Échec de calcul pour ${itemName}`);
                 }
-
-                // Micro-pause de respiration pour le CPU (20ms)
                 await new Promise(r => setTimeout(r, 20)); 
 
             } catch (error) {
-                console.error(`❌ Timeout sur ${itemName}:`, error.message);
                 forceCloseDialog();
-                await waitForElementToDisappear('.cdk-overlay-backdrop', 500);
             }
         }
     } finally {
         disableStealthMode();
-        console.log("🏁 Cycle terminé.");
     }
 }
 
-// --- 3. INTERFACE ---
-const button = document.createElement("button");
-button.innerText = "⚡ Lightning Auto-Price";
-button.style.position = "fixed";
-button.style.bottom = "20px";
-button.style.right = "20px";
-button.style.zIndex = "9999";
-button.style.padding = "15px 20px";
-button.style.backgroundColor = "#FACC15"; 
-button.style.color = "#000000"; 
-button.style.border = "none";
-button.style.borderRadius = "8px";
-button.style.fontWeight = "bold";
-button.style.cursor = "pointer";
-button.style.boxShadow = "0px 4px 15px rgba(250, 204, 21, 0.4)";
+function injectTradeAllButton() {
+    // On cible le conteneur où on veut ajouter le bouton
+    const container = document.querySelector('app-my-trades-home .bar');
+    
+    if (container && !document.querySelector('.trade-all-btn')) {
+        const btn = document.createElement("button");
+        btn.innerText = "🚀 Trade All";
+        btn.className = "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-primary trade-all-btn";
+        btn.style.marginLeft = "20px";
+        btn.style.backgroundColor = "#FF4081"; // Couleur distincte pour bien voir
+        
+        btn.addEventListener("click", () => {
+            // On récupère tous les boutons de trade de la page
+            const tradeButtons = document.querySelectorAll('.trade-link');
+            
+            if (tradeButtons.length === 0) {
+                alert("Aucun trade trouvé !");
+                return;
+            }
 
-button.addEventListener("click", () => {
-    button.innerText = "⏳ Vroum...";
-    button.disabled = true;
-    autoPriceLightning().then(() => {
-        button.innerText = "✅ Done !";
-        setTimeout(() => {
-            button.innerText = "⚡ Lightning Auto-Price";
-            button.disabled = false;
-        }, 1500);
-    });
-});
+            // On boucle sur chaque bouton avec un léger délai pour éviter de saturer le navigateur
+            tradeButtons.forEach((tradeBtn, index) => {
+                setTimeout(() => {
+                    tradeBtn.click();
+                    console.log(`Trade #${index + 1} cliqué`);
+                }, index * 300); // 300ms de délai entre chaque clic
+            });
+        });
 
-document.body.appendChild(button);
+        container.appendChild(btn);
+    }
+}
+
+// Surveillance pour ré-injecter si l'interface change
+const tradeObserver = new MutationObserver(injectTradeAllButton);
+tradeObserver.observe(document.body, { childList: true, subtree: true });
+
+// Lancement
+setTimeout(injectTradeAllButton, 2000);
+
+// --- INTERFACE : BOUTON INTELLIGENT ---
+function checkAndCreateButton() {
+    const isSellPage = window.location.href.includes('/sell');
+    const existingButton = document.querySelector('.my-auto-price-btn');
+
+    // Si on est sur la bonne page ET que le bouton n'existe pas encore
+    if (isSellPage && !existingButton) {
+        const button = document.createElement("button");
+        button.innerText = "⚡ Flash Auto-Price";
+        button.className = "my-auto-price-btn"; // Classe pour l'identifier
+        
+        // Styles
+        button.style.position = "fixed";
+        button.style.bottom = "20px";
+        button.style.right = "20px";
+        button.style.zIndex = "99999";
+        button.style.padding = "15px 20px";
+        button.style.backgroundColor = "#222222"; 
+        button.style.color = "#00FF00"; 
+        button.style.border = "2px solid #00FF00";
+        button.style.borderRadius = "8px";
+        button.style.fontWeight = "bold";
+        button.style.cursor = "pointer";
+        button.style.boxShadow = "0px 4px 15px rgba(0, 255, 0, 0.2)";
+
+        button.addEventListener("click", async () => {
+            button.innerText = "⏳ Hacking...";
+            button.disabled = true;
+            await autoPriceLightning();
+            button.innerText = "✅ Done !";
+            setTimeout(() => {
+                button.innerText = "⚡ Flash Auto-Price";
+                button.disabled = false;
+            }, 1500);
+        });
+
+        document.body.appendChild(button);
+    } 
+    // Si on n'est PAS sur la page de vente, on supprime le bouton s'il existe
+    else if (!isSellPage && existingButton) {
+        existingButton.remove();
+    }
+}
+
+// --- 3. LANCEMENT ET SURVEILLANCE ---
+
+// On vérifie l'URL et la présence du bouton toutes les 500ms
+// Remplace toute la fin de ton fichier par ceci :
+
+let initializationTimer = null;
+
+function safeInject() {
+    // Annule la précédente demande d'injection (Debounce)
+    if (initializationTimer) clearTimeout(initializationTimer);
+    
+    // Attend 500ms après la dernière modification du DOM pour injecter
+    // Cela laisse le temps à l'autre extension de finir son travail
+    initializationTimer = setTimeout(() => {
+        checkAndCreateButton();
+        injectTradeAllButton();
+    }, 500);
+}
+
+// On observe les changements du DOM
+const observer = new MutationObserver(safeInject);
+observer.observe(document.body, { childList: true, subtree: true });
+
+// Lancement initial
+safeInject();

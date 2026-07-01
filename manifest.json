@@ -4,10 +4,15 @@
   "version": "1.0.0",
   "description": "Optimise et injecte automatiquement les prix de vente basés sur les Buy Orders de CSFloat.",
   "author": "Ton Pseudo",
-  "content_scripts": [
-    {
-      "matches": ["*://csfloat.com/sell*"],
-      "js": ["content.js"]
+"content_scripts": [
+  {
+    "matches": ["*://csfloat.com/*"],
+    "js": ["content.js"]
+  } 
+],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "csfloat-pricer@MatMatif.com"
     }
-  ]
+  }
 }
